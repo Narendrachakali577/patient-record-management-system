@@ -1,7 +1,10 @@
 package com.example.patient.demo.controller;
 
 import com.example.patient.demo.entity.Patient;
+import com.example.patient.demo.service.AuditLogService;
 import com.example.patient.demo.service.PatientService;
+
+import jakarta.validation.Valid;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,9 +17,14 @@ import java.util.List;
 public class PatientController {
 
     private final PatientService patientService;
+    private final AuditLogService auditLogService;
 
-    public PatientController(PatientService patientService) {
+    public PatientController(
+            PatientService patientService,
+            AuditLogService auditLogService) {
+
         this.patientService = patientService;
+        this.auditLogService = auditLogService;
     }
 
     // TEST
@@ -28,7 +36,12 @@ public class PatientController {
     // GET ALL PATIENTS
     @GetMapping
     public List<Patient> getAllPatients() {
-        return patientService.getAllPatients();
+
+        List<Patient> patients = patientService.getAllPatients();
+
+        auditLogService.log("VIEW_ALL", null);
+
+        return patients;
     }
 
     // GET PATIENT BY ID
@@ -36,26 +49,46 @@ public class PatientController {
     public ResponseEntity<Patient> getPatientById(
             @PathVariable Long id) {
 
-        return patientService.getPatientById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        Patient patient = patientService.getPatientById(id)
+                .orElseThrow(() ->
+                        new RuntimeException("Patient not found"));
+
+        auditLogService.log("VIEW", id);
+
+        return ResponseEntity.ok(patient);
     }
 
     // CREATE PATIENT
     @PostMapping
     public Patient createPatient(
-            @RequestBody Patient patient) {
+            @Valid @RequestBody Patient patient) {
 
-        return patientService.createPatient(patient);
+        Patient savedPatient =
+                patientService.createPatient(patient);
+
+        auditLogService.log(
+                "CREATE",
+                savedPatient.getId()
+        );
+
+        return savedPatient;
     }
 
     // UPDATE PATIENT
     @PutMapping("/{id}")
     public Patient updatePatient(
             @PathVariable Long id,
-            @RequestBody Patient patient) {
+            @Valid @RequestBody Patient patient) {
 
-        return patientService.updatePatient(id, patient);
+        Patient updatedPatient =
+                patientService.updatePatient(id, patient);
+
+        auditLogService.log(
+                "UPDATE",
+                id
+        );
+
+        return updatedPatient;
     }
 
     // DELETE PATIENT
@@ -65,6 +98,13 @@ public class PatientController {
 
         patientService.deletePatient(id);
 
-        return ResponseEntity.ok("Patient deleted successfully");
+        auditLogService.log(
+                "DELETE",
+                id
+        );
+
+        return ResponseEntity.ok(
+                "Patient deleted successfully"
+        );
     }
 }
