@@ -2,6 +2,7 @@ package com.example.patient.demo.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -17,10 +18,23 @@ public class SecurityConfig {
 
         http
             .csrf(csrf -> csrf.disable())
+
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/patients/**").authenticated()
+
+                // DELETE → ADMIN only
+                .requestMatchers(
+                    HttpMethod.DELETE,
+                    "/api/patients/**"
+                ).hasRole("ADMIN")
+
+                // Other patient operations → USER or ADMIN
+                .requestMatchers(
+                    "/api/patients/**"
+                ).hasAnyRole("USER", "ADMIN")
+
                 .anyRequest().authenticated()
             )
+
             .httpBasic(httpBasic -> {});
 
         return http.build();
@@ -34,6 +48,11 @@ public class SecurityConfig {
                 .roles("USER")
                 .build();
 
-        return new InMemoryUserDetailsManager(user);
+        UserDetails admin = User.withUsername("admin")
+                .password("{noop}Admin@123")
+                .roles("ADMIN")
+                .build();
+
+        return new InMemoryUserDetailsManager(user, admin);
     }
 }
